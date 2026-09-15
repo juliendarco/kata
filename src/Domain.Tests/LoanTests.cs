@@ -2,7 +2,6 @@ namespace LibraryManagement.Domain.Tests;
 
 public class LoanTests
 {
-    private static readonly DateOnly BorrowedOn = new(2026, 1, 15);
     private static readonly DateOnly DueOn = new(2026, 2, 5);
 
     private readonly LoanFaker _loanFaker = new();
@@ -166,28 +165,14 @@ public class LoanTests
 
 internal sealed class LoanFaker : Faker<Loan>
 {
-    private Guid? _memberId;
-    private DateOnly _borrowedOn = new(2026, 1, 15);
-    private DateOnly _dueOn = new(2026, 2, 5);
+    private readonly DateOnly _borrowedOn = new(2026, 1, 15);
+    private readonly DateOnly _dueOn = new(2026, 2, 5);
 
     public LoanFaker()
         => CustomInstantiator(f => new Loan
         {
-            MemberId = _memberId ?? f.Random.Guid(),
+            MemberId = f.Random.Guid(),
             BorrowedOn = _borrowedOn,
             DueOn = _dueOn
         });
-
-    public LoanFaker WithMemberId(Guid memberId)
-    {
-        _memberId = memberId;
-        return this;
-    }
-
-    public LoanFaker WithDates(DateOnly borrowedOn, DateOnly dueOn)
-    {
-        _borrowedOn = borrowedOn;
-        _dueOn = dueOn;
-        return this;
-    }
 }

@@ -14,12 +14,7 @@ public class Library
         {
             throw new ArgumentException("Value cannot be null or whitespace.", nameof(title));
         }
-        
-        if (_bookAvailabilities.Select(x => x.Book).Any(b => b.Title == title))
-        {
-            throw new InvalidOperationException($"Book {title} already exists.");
-        }
-        
+
         if (string.IsNullOrWhiteSpace(author))
         {
             throw new ArgumentException("Value cannot be null or whitespace.", nameof(author));
@@ -28,6 +23,11 @@ public class Library
         if (totalCopies < 1)
         {
             throw new ArgumentException("Value must be greater than 0.", nameof(totalCopies));
+        }
+
+        if (_bookAvailabilities.Any(x => x.Book.Title == title && x.Book.Author == author))
+        {
+            throw new InvalidOperationException($"Book {title} already exists.");
         }
 
         var bookAvailability = new BookAvailability
@@ -40,7 +40,7 @@ public class Library
             TotalCopies = totalCopies
         };
         _bookAvailabilities.Add(bookAvailability);
-        
+
         return bookAvailability.Book.Id;
     }
 
@@ -96,7 +96,7 @@ public class Library
     }
 
     public bool RemoveMember(MemberBase member)
-    {
-        return _members.Any(m => m.Id == member.Id) && _members.Remove(member);
-    }
+        => _bookAvailabilities.Any(b => b.HasActiveLoan(member.Id))
+            ? throw new InvalidOperationException($"Member {member} still has active loans.")
+            : _members.Remove(member);
 }
