@@ -1,37 +1,40 @@
 namespace LibraryManagement.Domain;
 
-public class BookAvailability
+internal sealed class BookAvailability
 {
-    private readonly List<Guid> _borrowerIds = [];
+    private readonly List<Loan> _loans = [];
     
     public required Book Book { get; init; }
     public required int TotalCopies { get; init; }
     
-    public IReadOnlyList<Guid> BorrowerIds => _borrowerIds.ToArray();
-    public int CopiesOnLoan => _borrowerIds.Count;
+    public IReadOnlyList<Loan> Loans => _loans.ToArray();
+    public int CopiesOnLoan => _loans.Count;
     public int AvailableCopies => TotalCopies - CopiesOnLoan;
     public bool IsAvailable => AvailableCopies > 0;
     
-    public void Lend(Guid memberId)
+    public bool HasActiveLoan(Guid memberId) => _loans.Any(x => x.MemberId == memberId);
+    
+    public void Lend(MemberBase member, TimeProvider timeProvider)
     {
         if (!IsAvailable)
         {
             throw new InvalidOperationException($"No copy of {Book.Title} available.");
         }
 
-        if (_borrowerIds.Contains(memberId))
+        if (HasActiveLoan(member.Id))
         {
-            throw new InvalidOperationException($"Member {memberId} already borrowed {Book.Title}.");
+            throw new InvalidOperationException($"Member {member} already borrowed {Book.Title}.");
         }
 
-        _borrowerIds.Add(memberId);
+        var today = timeProvider.GetToday();
+        _loans.Add(new Loan(member.Id, today, today.AddDays(member.MaxLoanDurationInWeeks * 7)));
     }
 
-    public void Return(Guid memberId)
+    public void Return(MemberBase member)
     {
-        if (!_borrowerIds.Remove(memberId))
-        {
-            throw new InvalidOperationException($"Member {memberId} did not borrow {Book.Title}.");
-        }
+        var loan = _loans.FirstOrDefault(x => x.MemberId == member.Id)
+                   ?? throw new InvalidOperationException($"Member {member} did not borrow {Book.Title}.");
+
+        _loans.Remove(loan);
     }
 }

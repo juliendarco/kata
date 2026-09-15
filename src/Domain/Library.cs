@@ -5,10 +5,10 @@ public class Library
     private readonly List<BookAvailability> _bookAvailabilities = [];
     private readonly List<MemberBase> _members = [];
 
-    public IReadOnlyList<Book> Books => _bookAvailabilities.Select(b => b.Book).ToArray();
+    public IReadOnlyList<string> Books => _bookAvailabilities.Select(b => b.Book.Title).ToArray();
     public IReadOnlyList<MemberBase> Members => _members.ToArray();
     
-    public Book AddBook(string title, string author, int totalCopies = 1)
+    public Guid AddBook(string title, string author, int totalCopies = 1)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -41,30 +41,44 @@ public class Library
         };
         _bookAvailabilities.Add(bookAvailability);
         
-        return bookAvailability.Book;
+        return bookAvailability.Book.Id;
     }
+
+    private MemberBase FindMember(Guid memberId)
+        => _members.FirstOrDefault(m => m.Id == memberId)
+           ?? throw new InvalidOperationException($"Member {memberId} is not registered.");
     
-    public void BorrowBook(Guid bookId, Guid memberId)
+    private BookAvailability FindBook(Guid bookId)
+        => _bookAvailabilities.FirstOrDefault(b => b.Book.Id == bookId)
+           ?? throw new InvalidOperationException($"Book {bookId} does not exist.");
+    
+    public void BorrowBook(Guid bookId, Guid memberId, TimeProvider timeProvider)
     {
-        var member = _members.FirstOrDefault(m => m.Id == memberId)
-                     ?? throw new InvalidOperationException($"Member {memberId} is not registered.");
+        var member = FindMember(memberId);
+        var book = FindBook(bookId);
 
-        var availability = _bookAvailabilities.FirstOrDefault(b => b.Book.Id == bookId)
-                           ?? throw new InvalidOperationException($"Book {bookId} does not exist.");
-
-        var memberLoans = _bookAvailabilities.Count(b => b.BorrowerIds.Contains(memberId));
+        var memberLoans = _bookAvailabilities.Count(b => b.HasActiveLoan(memberId));
         if (memberLoans >= member.MaxLoans)
         {
             throw new InvalidOperationException(
                 $"Member {member} as reached the limit of {member.MaxLoans} simultaneous loans.");
         }
 
-        if (!availability.IsAvailable)
+        if (!book.IsAvailable)
         {
             throw new InvalidOperationException($"Book {bookId} is not available.");
         }
 
-        availability.Lend(memberId);
+        book.Lend(memberId, timeProvider);
+    }
+    
+    public void ReturnBook(Guid bookId, Guid memberId)
+    {
+        var member = FindMember(memberId);
+        var book = FindBook(bookId);
+        
+        
+        book.Return(memberId, timeProvider);
     }
     
     public void AddMember(MemberBase member)

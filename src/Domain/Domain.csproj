@@ -4,4 +4,8 @@
         <RootNamespace>LibraryManagement.Domain</RootNamespace>
     </PropertyGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Domain.Tests" />
+    </ItemGroup>
+
 </Project>
