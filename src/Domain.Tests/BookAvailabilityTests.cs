@@ -2,10 +2,10 @@ namespace LibraryManagement.Domain.Tests;
 
 public class BookAvailabilityTests
 {
-    private static readonly DateOnly FakeDate = new(2026, 1, 15);
+    private static readonly DateOnly Today = new(2026, 1, 15);
 
     private readonly BookAvailabilityFaker _bookAvailabilityFaker = new();
-    private readonly FakeTimeProvider _fakeTimeProvider = new(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero));
+    private readonly MemberFaker _memberFaker = new();
 
     [Fact]
     public void Should_HaveAllCopiesAvailable_WhenCreated()
@@ -27,7 +27,7 @@ public class BookAvailabilityTests
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
 
         // Act
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Assert
         availability.AvailableCopies.Should().Be(1);
@@ -39,14 +39,14 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
+        var member = _memberFaker.Generate();
 
         // Act
-        availability.Lend(memberId, _fakeTimeProvider);
+        availability.Lend(member, Today);
 
         // Assert
         availability.CopiesOnLoan.Should().Be(1);
-        availability.Loans.Should().ContainSingle().Which.MemberId.Should().Be(memberId);
+        availability.Loans.Should().ContainSingle().Which.MemberId.Should().Be(member.Id);
     }
 
     [Fact]
@@ -56,10 +56,25 @@ public class BookAvailabilityTests
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
 
         // Act
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Assert
-        availability.Loans.Should().ContainSingle().Which.BorrowedOn.Should().Be(FakeDate);
+        availability.Loans.Should().ContainSingle().Which.BorrowedOn.Should().Be(Today);
+    }
+
+    [Fact]
+    public void Should_ComputeDueDate_FromMemberLoanDuration()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
+        var member = _memberFaker.Generate();
+
+        // Act
+        availability.Lend(member, Today);
+
+        // Assert
+        availability.Loans.Should().ContainSingle()
+            .Which.DueOn.Should().Be(Today.AddDays(member.MaxLoanDurationInWeeks * 7));
     }
 
     [Fact]
@@ -69,8 +84,8 @@ public class BookAvailabilityTests
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
 
         // Act
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Assert
         availability.AvailableCopies.Should().Be(0);
@@ -82,10 +97,10 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(1).Generate();
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Act
-        var act = () => availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        var act = () => availability.Lend(_memberFaker.Generate(), Today);
 
         // Assert
         act.Should().Throw<InvalidOperationException>();
@@ -96,11 +111,11 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
 
         // Act
-        var act = () => availability.Lend(memberId, _fakeTimeProvider);
+        var act = () => availability.Lend(member, Today);
 
         // Assert
         act.Should().Throw<InvalidOperationException>();
@@ -111,11 +126,11 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
 
         // Act
-        var hasActiveLoan = availability.HasActiveLoan(memberId);
+        var hasActiveLoan = availability.HasActiveLoan(member.Id);
 
         // Assert
         hasActiveLoan.Should().BeTrue();
@@ -126,7 +141,7 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Act
         var hasActiveLoan = availability.HasActiveLoan(Guid.NewGuid());
@@ -140,12 +155,12 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
-        availability.Return(memberId);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+        availability.Return(member, Today);
 
         // Act
-        var hasActiveLoan = availability.HasActiveLoan(memberId);
+        var hasActiveLoan = availability.HasActiveLoan(member.Id);
 
         // Assert
         hasActiveLoan.Should().BeFalse();
@@ -156,16 +171,60 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
 
         // Act
-        availability.Return(memberId);
+        availability.Return(member, Today);
 
         // Assert
         availability.CopiesOnLoan.Should().Be(0);
         availability.AvailableCopies.Should().Be(2);
-        availability.Loans.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Should_KeepLoanHistory_WhenReturned()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+
+        // Act
+        availability.Return(member, Today);
+
+        // Assert
+        availability.Loans.Should().ContainSingle().Which.ReturnedOn.Should().Be(Today);
+    }
+
+    [Fact]
+    public void Should_ReturnNoDaysLate_WhenReturnedOnTime()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+
+        // Act
+        var daysLate = availability.Return(member, Today.AddDays(member.MaxLoanDurationInWeeks * 7));
+
+        // Assert
+        daysLate.Should().Be(0);
+    }
+
+    [Fact]
+    public void Should_ReturnDaysLate_WhenReturnedLate()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+
+        // Act
+        var daysLate = availability.Return(member, Today.AddDays(member.MaxLoanDurationInWeeks * 7 + 5));
+
+        // Assert
+        daysLate.Should().Be(5);
     }
 
     [Fact]
@@ -173,11 +232,11 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(1).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
 
         // Act
-        availability.Return(memberId);
+        availability.Return(member, Today);
 
         // Assert
         availability.IsAvailable.Should().BeTrue();
@@ -188,15 +247,16 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(1).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
-        availability.Return(memberId);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+        availability.Return(member, Today);
 
         // Act
-        availability.Lend(memberId, _fakeTimeProvider);
+        availability.Lend(member, Today);
 
         // Assert
         availability.CopiesOnLoan.Should().Be(1);
+        availability.Loans.Should().HaveCount(2);
     }
 
     [Fact]
@@ -206,7 +266,7 @@ public class BookAvailabilityTests
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
 
         // Act
-        var act = () => availability.Return(Guid.NewGuid());
+        var act = () => availability.Return(_memberFaker.Generate(), Today);
 
         // Assert
         act.Should().Throw<InvalidOperationException>();
@@ -217,12 +277,12 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        var memberId = Guid.NewGuid();
-        availability.Lend(memberId, _fakeTimeProvider);
-        availability.Return(memberId);
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+        availability.Return(member, Today);
 
         // Act
-        var act = () => availability.Return(memberId);
+        var act = () => availability.Return(member, Today);
 
         // Assert
         act.Should().Throw<InvalidOperationException>();
@@ -233,16 +293,49 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(3).Generate();
-        var firstMemberId = Guid.NewGuid();
-        var secondMemberId = Guid.NewGuid();
-        availability.Lend(firstMemberId, _fakeTimeProvider);
-        availability.Lend(secondMemberId, _fakeTimeProvider);
+        var firstMember = _memberFaker.Generate();
+        var secondMember = _memberFaker.Generate();
+        availability.Lend(firstMember, Today);
+        availability.Lend(secondMember, Today);
 
         // Act
-        availability.Return(firstMemberId);
+        availability.Return(firstMember, Today);
 
         // Assert
-        availability.Loans.Should().ContainSingle().Which.MemberId.Should().Be(secondMemberId);
+        availability.CopiesOnLoan.Should().Be(1);
+        availability.HasActiveLoan(secondMember.Id).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Should_ReturnOnlyMemberLoans_WhenListingLoansOf()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(3).Generate();
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+        availability.Lend(_memberFaker.Generate(), Today);
+
+        // Act
+        var loans = availability.LoansOf(member.Id);
+
+        // Assert
+        loans.Should().ContainSingle().Which.MemberId.Should().Be(member.Id);
+    }
+
+    [Fact]
+    public void Should_IncludeReturnedLoans_WhenListingLoansOf()
+    {
+        // Arrange
+        var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
+        var member = _memberFaker.Generate();
+        availability.Lend(member, Today);
+        availability.Return(member, Today);
+
+        // Act
+        var loans = availability.LoansOf(member.Id);
+
+        // Assert
+        loans.Should().ContainSingle().Which.IsActive.Should().BeFalse();
     }
 
     [Fact]
@@ -250,11 +343,11 @@ public class BookAvailabilityTests
     {
         // Arrange
         var availability = _bookAvailabilityFaker.WithTotalCopies(2).Generate();
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Act
         var loans = availability.Loans;
-        availability.Lend(Guid.NewGuid(), _fakeTimeProvider);
+        availability.Lend(_memberFaker.Generate(), Today);
 
         // Assert
         loans.Should().ContainSingle();
@@ -263,22 +356,22 @@ public class BookAvailabilityTests
 
 internal sealed class BookAvailabilityFaker : Faker<BookAvailability>
 {
-    public BookAvailabilityFaker() => WithTotalCopies(null);
+    private int? _totalCopies;
 
-    public BookAvailabilityFaker WithTotalCopies(int totalCopies) => WithTotalCopies((int?)totalCopies);
-
-    private BookAvailabilityFaker WithTotalCopies(int? totalCopies)
-    {
-        CustomInstantiator(f => new BookAvailability
+    public BookAvailabilityFaker()
+        => CustomInstantiator(f => new BookAvailability
         {
             Book = new Book
             {
                 Title = f.Commerce.ProductName(),
                 Author = f.Name.FullName()
             },
-            TotalCopies = totalCopies ?? f.Random.Int(1, 10)
+            TotalCopies = _totalCopies ?? f.Random.Int(1, 10)
         });
 
+    public BookAvailabilityFaker WithTotalCopies(int totalCopies)
+    {
+        _totalCopies = totalCopies;
         return this;
     }
 }

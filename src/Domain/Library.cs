@@ -57,28 +57,33 @@ public class Library
         var member = FindMember(memberId);
         var book = FindBook(bookId);
 
-        var memberLoans = _bookAvailabilities.Count(b => b.HasActiveLoan(memberId));
-        if (memberLoans >= member.MaxLoans)
+        var activeLoans = _bookAvailabilities.Count(b => b.HasActiveLoan(memberId));
+        if (activeLoans >= member.MaxLoans)
         {
             throw new InvalidOperationException(
-                $"Member {member} as reached the limit of {member.MaxLoans} simultaneous loans.");
+                $"Member {member} has reached the limit of {member.MaxLoans} simultaneous loans.");
         }
 
-        if (!book.IsAvailable)
-        {
-            throw new InvalidOperationException($"Book {bookId} is not available.");
-        }
-
-        book.Lend(memberId, timeProvider);
+        book.Lend(member, timeProvider.GetToday());
     }
     
-    public void ReturnBook(Guid bookId, Guid memberId)
+    public int ReturnBook(Guid bookId, Guid memberId, TimeProvider timeProvider)
     {
         var member = FindMember(memberId);
         var book = FindBook(bookId);
-        
-        
-        book.Return(memberId, timeProvider);
+
+        return book.Return(member, timeProvider.GetToday());
+    }
+    
+    public decimal GetTotalPenalties(Guid memberId, TimeProvider timeProvider)
+    {
+        FindMember(memberId);
+
+        var today = timeProvider.GetToday();
+
+        return _bookAvailabilities
+            .SelectMany(b => b.LoansOf(memberId))
+            .Sum(l => l.Penalty(today));
     }
     
     public void AddMember(MemberBase member)
