@@ -1,6 +1,6 @@
 namespace LibraryManagement.Domain;
 
-internal class BookAvailability
+public class BookAvailability
 {
     private readonly List<Guid> _borrowerIds = [];
     

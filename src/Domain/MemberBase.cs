@@ -9,4 +9,5 @@ public abstract class MemberBase
     public override string ToString() => $"{FirstName} {LastName}";
     
     public abstract int MaxLoans { get; }
+    public abstract int MaxLoanDurationInWeeks { get; }
 }

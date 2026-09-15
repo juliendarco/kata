@@ -28,6 +28,7 @@ public class MemberBaseTests
 public sealed class MemberBaseForTest : MemberBase
 {
     public override int MaxLoans => 2;
+    public override int MaxLoanDurationInWeeks => 1;
 }
 
 public sealed class MemberBaseFaker : Faker<MemberBaseForTest>

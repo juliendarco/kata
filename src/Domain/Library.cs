@@ -59,6 +59,11 @@ public class Library
                 $"Member {member} as reached the limit of {member.MaxLoans} simultaneous loans.");
         }
 
+        if (!availability.IsAvailable)
+        {
+            throw new InvalidOperationException($"Book {bookId} is not available.");
+        }
+
         availability.Lend(memberId);
     }
     
